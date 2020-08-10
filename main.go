@@ -19,6 +19,7 @@ import (
 
 var apiURL = flag.String("url", "", "send log via loki api using the provided url (e.g http://localhost:3100/api/prom/push)")
 var logPerSec = flag.Int64("logps", 500, "The total amount of log per second to generate.(default 500)")
+var tenantID = flag.String("tenant", "fake", "The tenant ID")
 
 func init() {
 	lvl := logging.Level{}
@@ -35,7 +36,7 @@ func main() {
 		panic(err)
 	}
 	if apiURL != nil && *apiURL != "" {
-		logViaAPI(*apiURL, host)
+		logViaAPI(*apiURL, host, *tenantID)
 		return
 	}
 	for {
@@ -55,7 +56,7 @@ func main() {
 	}
 }
 
-func logViaAPI(apiURL string, hostname string) {
+func logViaAPI(apiURL string, hostname string, tenantID string) {
 	u, err := url.Parse(apiURL)
 	if err != nil {
 		panic(err)
@@ -69,7 +70,8 @@ func logViaAPI(apiURL string, hostname string) {
 			MaxBackoff: time.Second * 5,
 			MaxRetries: 5,
 		},
-		URL: flagext.URLValue{URL: u},
+		URL:      flagext.URLValue{URL: u},
+		TenantID: tenantID,
 	}, util.Logger)
 	if err != nil {
 		panic(err)
