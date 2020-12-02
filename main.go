@@ -15,11 +15,20 @@ import (
 	"github.com/cortexproject/cortex/pkg/util/flagext"
 	"github.com/grafana/loki/pkg/promtail/client"
 	"github.com/prometheus/common/model"
+	"github.com/spf13/cobra"
 	"github.com/weaveworks/common/logging"
 	"github.com/weaveworks/common/server"
 )
 
 var stopC = make(chan os.Signal)
+var cfgFile string
+
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   "logger",
+	Short: "A log benchmark tool",
+}
+
 var apiURL = flag.String("url", "", "send log via loki api using the provided url (e.g http://localhost:3100/api/prom/push)")
 var logPerSec = flag.Int64("logps", 500, "The total amount of log per second to generate.(default 500)")
 var remoteType = flag.String("remote-type", "loki", "Type of the remote destination: loki, elasticsearch. (default loki)")
