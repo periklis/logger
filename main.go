@@ -17,8 +17,13 @@ import (
 	"github.com/weaveworks/common/server"
 )
 
+const logChars = "abcdefghijklmnopqrstuvwxyz{}[]!$*()-+=-<>?0123456789;"
+
 var apiURL = flag.String("url", "", "send log via loki api using the provided url (e.g http://localhost:3100/api/prom/push)")
 var logPerSec = flag.Int64("logps", 500, "The total amount of log per second to generate.(default 500)")
+var tenantID = flag.String("tenant", "fake", "The tenant ID")
+var messageSize = flag.Int64("message-size", 100, "The total size of the log in bytes")
+var messageAdjust = flag.Int64("message-adjust", 0, "The duration in seconds to adjust log timestamp.")
 
 func init() {
 	lvl := logging.Level{}
@@ -35,12 +40,13 @@ func main() {
 		panic(err)
 	}
 	if apiURL != nil && *apiURL != "" {
-		logViaAPI(*apiURL, host)
+		logViaAPI(*apiURL, host, *tenantID)
 		return
 	}
 	for {
 		var out io.Writer
 		var stream string
+
 		switch rand.Intn(2) {
 		case 1:
 			out = os.Stderr
@@ -48,14 +54,14 @@ func main() {
 		default:
 			out = os.Stdout
 			stream = "stdout"
-
 		}
-		fmt.Fprintf(out, "ts=%s stream=%s host=%s lvl=%s msg=%s \n", time.Now().Format(time.RFC3339Nano), stream, host, randLevel(), randomLog())
+
+		fmt.Fprintf(out, "ts=%s stream=%s host=%s lvl=%s msg=%s \n", timestamp(), stream, "hi", randLevel(), randomLog())
 		time.Sleep(time.Second / time.Duration(*logPerSec))
 	}
 }
 
-func logViaAPI(apiURL string, hostname string) {
+func logViaAPI(apiURL string, hostname string, tenantID string) {
 	u, err := url.Parse(apiURL)
 	if err != nil {
 		panic(err)
@@ -69,7 +75,8 @@ func logViaAPI(apiURL string, hostname string) {
 			MaxBackoff: time.Second * 5,
 			MaxRetries: 5,
 		},
-		URL: flagext.URLValue{URL: u},
+		URL:      flagext.URLValue{URL: u},
+		TenantID: tenantID,
 	}, util.Logger)
 	if err != nil {
 		panic(err)
@@ -91,7 +98,13 @@ func logViaAPI(apiURL string, hostname string) {
 }
 
 func randomLog() string {
-	return loglines[rand.Intn(len(loglines))]
+	log := make([]byte, *messageSize)
+
+	for i, _ := range log {
+		log[i] = logChars[rand.Intn(len(logChars))]
+	}
+
+	return string(log)
 }
 
 func randLevel() model.LabelValue {
@@ -107,33 +120,13 @@ func randService() model.LabelValue {
 	return services[rand.Intn(6)]
 }
 
-var loglines = []string{
-	"failing to cook potatoes",
-	"successfully launched a car in space",
-	"we got here",
-	"panic: could not read the manual",
-	"error while reading floppy disk",
-	"failed to reach the cloud, try again on a rainy day",
-	"failed to get an error message",
-	"You're screwed !",
-	"Oups I did it again",
-	"a chicken died during processing",
-	"sorry the server is not in a mood",
-	"Stupidity made this error, not me",
-	"random error happened during compression",
-	"too many foobar variable",
-	"cannot over-write a locked variable.",
-	"foo insists on strongly-typed programming languages",
-	"John Doe solved the Travelling Salesman problem in O(1) time. Here's the pseudo-code: Break salesman into N pieces. Kick each piece to a different city.",
-	"infinite loop succeeded in less than 3 seconds",
-	"could not compute the last digit of PI",
-	"OS not found try installing one",
-	"container sinked in whales",
-	"Don’t use beef stew as a computer password. It’s not stroganoff.",
-	"I used stack overflow to fix this bug",
-	"try googling this error message if it appears again",
-	"change stuff and see what happens",
-	"panic: this should never happen",
+func timestamp() string {
+	if *messageAdjust > 0 {
+		*messageAdjust--
+	}
+
+	previous := time.Now().Add(time.Duration(-int(*messageAdjust)) * time.Second)
+	return previous.Format(time.RFC3339Nano)
 }
 
 var levels = []model.LabelValue{
