@@ -22,7 +22,8 @@ const logChars = "abcdefghijklmnopqrstuvwxyz{}[]!$*()-+=-<>?0123456789;"
 var apiURL = flag.String("url", "", "send log via loki api using the provided url (e.g http://localhost:3100/api/prom/push)")
 var logPerSec = flag.Int64("logps", 500, "The total amount of log per second to generate.(default 500)")
 var tenantID = flag.String("tenant", "fake", "The tenant ID")
-var messageSize = flag.Int64("message-size", 1000, "The total size of the log in bytes")
+var messageSize = flag.Int64("message-size", 100, "The total size of the log in bytes")
+var messageAdjust = flag.Int64("message-adjust", 0, "The duration in seconds to adjust log timestamp.")
 
 func init() {
 	lvl := logging.Level{}
@@ -55,7 +56,7 @@ func main() {
 			stream = "stdout"
 		}
 
-		fmt.Fprintf(out, "ts=%s stream=%s host=%s lvl=%s msg=%s \n", time.Now().Format(time.RFC3339Nano), stream, "hi", randLevel(), randomLog())
+		fmt.Fprintf(out, "ts=%s stream=%s host=%s lvl=%s msg=%s \n", timestamp(), stream, "hi", randLevel(), randomLog())
 		time.Sleep(time.Second / time.Duration(*logPerSec))
 	}
 }
@@ -117,6 +118,15 @@ func randComponent() model.LabelValue {
 
 func randService() model.LabelValue {
 	return services[rand.Intn(6)]
+}
+
+func timestamp() string {
+	if *messageAdjust > 0 {
+		*messageAdjust--
+	}
+
+	previous := time.Now().Add(time.Duration(-int(*messageAdjust)) * time.Second)
+	return previous.Format(time.RFC3339Nano)
 }
 
 var levels = []model.LabelValue{
